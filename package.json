@@ -1,0 +1,22 @@
+{
+  "name": "mybuilds",
+  "version": "1.0.0",
+  "description": "A RESTful Multi-Task Management API built with Node.js, Express.js and MongoDB.",
+  "keywords": [
+    "task-management",
+    "rest-api",
+    "nodejs",
+    "expressjs",
+    "mongodb",
+    "jwt",
+    "authentication",
+    "crud"
+  ],
+  "license": "ISC",
+  "author": "arifa",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
