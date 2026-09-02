@@ -1,13 +1,12 @@
 //require('dotenv').config({path: './.enc'})
 import dotenv from "dotenv"// why we import dotenv bcz when main file excute, all .env early as possible, and used with experimental features
 import connectDB from "./db/dbConnection.js";
-import express from 'express'
+import {app} from "./app.js"
 
 dotenv.config({
     path: './.env'
 })
 
-const app=express()
 
 connectDB()
 .then(()=>{

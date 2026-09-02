@@ -1,8 +1,8 @@
-import { asyncHandler } from "../utils/asyncHandler";
-import { User } from "../models/user.model";
-import { ApiError } from "../utils/apiErrors";
-import { uploadOnCloudinary } from "../utils/cloudinary";
-import { ApiResponse } from "../utils/apiResponse";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { User } from "../models/user.model.js";
+import { ApiError } from "../utils/apiErrors.js";
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import { ApiResponse } from "../utils/apiResponse.js";
 
 
 //create controller for user register
@@ -19,9 +19,13 @@ const registerUser=asyncHandler(async(req,res)=>{
 
 
     // 1. Get information from frontend
+    console.log("controller started..");
+    console.log("REQ BODY:", req.body);
+
     const {email, username, password, fullName}=req.body
 
     // 2. Check if user already exists
+    console.log("2 body received");
     const existedUser=await User.findOne({
         $or: [{username}, {email}]
     })
@@ -31,18 +35,22 @@ const registerUser=asyncHandler(async(req,res)=>{
     }
 
     // 3. Get avatar local path
+    console.log("3 user checked");
     const avatarLocalPath = req.files?.avatar?.[0]?.path;
     if (!avatarLocalPath) {
         throw new ApiError(400, "avatar image required")
     }
 
      // 4. Upload avatar to Cloudinary
+     console.log("4 avatar path:", avatarLocalPath);
     const avatar= await uploadOnCloudinary(avatarLocalPath)
     if (!avatar) {
         throw new ApiError(500, "upload failed!!")
     }
 
     // 5. Create user
+    console.log("user created");
+    
     const newUser=await User.create({
         username,
         fullName,
@@ -60,6 +68,7 @@ const registerUser=asyncHandler(async(req,res)=>{
     }
 
     //Return response
+
     return res
     .status(201)
     .json(new ApiResponse(201, createdUser, "user registered successfully..."))
