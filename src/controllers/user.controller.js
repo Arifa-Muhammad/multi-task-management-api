@@ -74,4 +74,48 @@ const registerUser=asyncHandler(async(req,res)=>{
     .json(new ApiResponse(201, createdUser, "user registered successfully..."))
 })
 
-export {registerUser}
+const loginUser= asyncHandler(async(req, res)=>{
+    //get info =>username and password
+    //check email and password are correct => password check with bcrypt.compare
+    //access and refresh token generate
+    //send cookies
+    //refresh token saved in db
+    //send res
+
+    const {username, password}=req.body
+
+    const user=await User.findOne({
+        $or: [{username}]
+    })
+    if (!user) {
+        throw new ApiError(404, "user does not exists!!")
+    }
+
+    const passwordValid=await user.isPasswordCorrect(password)
+    if (!passwordValid) {
+        throw new ApiError(401, "invalid user cradentials")
+    }
+
+    const accessToken= user.generateAccessToken()
+    const refreshToken= user.generateRefreshToken()
+
+    console.log("Access and Refresh token generated successfully");
+    
+    user.refreshToken= refreshToken;
+    await user.save({validateBeforeSave: false})
+
+    console.log("Refresh token saved in DB!!")
+
+    const options= {
+        httpOnly: true,
+        secure: false
+    }
+    return res
+    .status(201)
+    .cookie("accessToken",accessToken,options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(new ApiResponse(201,"user login successfully."))
+
+})
+
+export {registerUser, loginUser}
