@@ -24,6 +24,9 @@ app.use((req, res, next) => {
 import userRouter from "./routes/user.routes.js"
 app.use("/api/v1/auth", userRouter)
 
+import taskRouter from "./routes/task.route.js"
+app.use("/api/v1/task", taskRouter)
+
 app.use(errorHandler)
 
 export {app}
