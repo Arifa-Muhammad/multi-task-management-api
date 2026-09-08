@@ -2,6 +2,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { Task } from "../models/task.model.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 import { ApiError } from "../utils/apiErrors.js";
+import { Activity } from "../models/activity.model.js";
 
 //1. create Task
 const createTask = asyncHandler(async (req, res) => {
@@ -16,6 +17,14 @@ const createTask = asyncHandler(async (req, res) => {
     owner: req.user._id,
   });
 
+  //activity create
+  await Activity.create({
+    user: req.user._id,
+    task: task._id,
+    action: "created",
+    message: `task "${task.title}" created`,
+  });
+
   return res
     .status(200)
     .json(new ApiResponse(200, task, "task created successfully!!"));
@@ -25,7 +34,6 @@ const createTask = asyncHandler(async (req, res) => {
 const getAllTask = asyncHandler(async (req, res) => {
   const tasks = await Task.find({
     owner: req.user._id,
-    
   });
 
   return res
@@ -57,7 +65,7 @@ const getTaskById = asyncHandler(async (req, res) => {
   const task = await Task.findOne({
     _id: taskId,
     owner: req.user._id,
-    isDeleted:false
+    isDeleted: false,
   });
 
   if (!task) {
@@ -94,6 +102,15 @@ const updateTask = asyncHandler(async (req, res) => {
   if (!task) {
     throw new ApiError(404, "task not found");
   }
+
+  // Activity create
+  await Activity.create({
+    user: req.user._id,
+    task: task._id,
+    action: "updated",
+    message: `Task "${task.title}" updated`,
+  });
+
   return res
     .status(201)
     .json(new ApiResponse(201, task, "task updated successfully"));
@@ -128,7 +145,6 @@ const searchTask = asyncHandler(async (req, res) => {
   } = req.query;
   const filter = {
     owner: req.user._id,
-    
   };
 
   //search by title
@@ -208,25 +224,32 @@ const getTaskStats = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, stat, "Task statistics fetched successfully"));
 });
 
- //filter by soft delete
-  const softDelete = asyncHandler(async (req, res) => {
-    const { taskId } = req.params;
-    const task = await Task.findOne({
-      _id: taskId,
-      owner: req.user._id,
-      
-    });
-    if (!task) {
-      throw new ApiError(404, "Task not found");
-    }
-
-    task.isDeleted = true;
-    await task.save();
-
-    return res
-      .status(200)
-      .json(new ApiResponse(200, task, "Task deleted successfully"));
+//filter by soft delete
+const softDelete = asyncHandler(async (req, res) => {
+  const { taskId } = req.params;
+  const task = await Task.findOne({
+    _id: taskId,
+    owner: req.user._id,
   });
+  if (!task) {
+    throw new ApiError(404, "Task not found");
+  }
+
+  task.isDeleted = true;
+  await task.save();
+
+  // Activity create
+  await Activity.create({
+    user: req.user._id,
+    task: task._id,
+    action: "deleted",
+    message: `Task "${task.title}" deleted`,
+  });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, task, "Task deleted successfully"));
+});
 
 export {
   createTask,
@@ -236,5 +259,5 @@ export {
   deleteTask,
   searchTask,
   getTaskStats,
-  softDelete
+  softDelete,
 };

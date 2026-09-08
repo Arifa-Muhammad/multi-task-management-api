@@ -10,6 +10,7 @@ import {
   softDelete,
   updateTask /*getTaskByTitle */,
 } from "../controllers/task.controller.js";
+import { getRecentActivity } from "../controllers/activity.controller.js";
 
 const router2 = Router();
 
@@ -30,4 +31,6 @@ router2.route("/search-task").get(verifyJWT, searchTask);
 
 router2.delete("/soft-delete/:taskId", verifyJWT, softDelete)
 
+
+router2.get("/activity", verifyJWT, getRecentActivity)
 export default router2;
