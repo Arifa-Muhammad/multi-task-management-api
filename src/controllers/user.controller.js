@@ -1,9 +1,12 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/apiErrors.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import {
+  deleteFromCloudinary,
+  uploadOnCloudinary,
+} from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/apiResponse.js";
-import jwt from "jsonwebtoken"
+import jwt from "jsonwebtoken";
 
 //create controller for user register
 const registerUser = asyncHandler(async (req, res) => {
@@ -192,36 +195,71 @@ const updateUserProfile = asyncHandler(async (req, res) => {
 });
 
 //refresh access token
-const refreshAccessToken= asyncHandler(async(req,res)=>{
-  const incomingRefreshToken= req.cookies?.refreshToken || req.body.refreshToken;
+const refreshAccessToken = asyncHandler(async (req, res) => {
+  const incomingRefreshToken =
+    req.cookies?.refreshToken || req.body.refreshToken;
   if (!incomingRefreshToken) {
-    throw new ApiError(401, "refresh token required!!")
+    throw new ApiError(401, "refresh token required!!");
   }
-  const decodedToken= jwt.verify(
+  const decodedToken = jwt.verify(
     incomingRefreshToken,
-    process.env.REFRESH_TOKEN_SECRETE
-  )
-  const user=await User.findById(decodedToken?._id)
-   if (!user) {
+    process.env.REFRESH_TOKEN_SECRETE,
+  );
+  const user = await User.findById(decodedToken?._id);
+  if (!user) {
     throw new ApiError(401, "Invalid refresh token");
-    }
+  }
 
   if (incomingRefreshToken !== user.refreshToken) {
-    throw new ApiError(404, "Refresh token is expired or invalid")
+    throw new ApiError(404, "Refresh token is expired or invalid");
   }
-  const newAccessToken=user.generateAccessToken()
+  const newAccessToken = user.generateAccessToken();
 
-  const options={
-    httpOnly:true,
-    secure: true
-  }
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
 
   return res
-  .status(200)
-  .cookie("accessToken", newAccessToken, options)
-  .json(new ApiResponse(200,{}, "access token refreshed successfully" ))
+    .status(200)
+    .cookie("accessToken", newAccessToken, options)
+    .json(new ApiResponse(200, {}, "access token refreshed successfully"));
+});
 
-})
+//update avatar
+const updateAvatar = asyncHandler(async (req, res) => {
+  const avatarLocalPath = req.file?.path;
+  if (!avatarLocalPath) {
+    throw new ApiError(400, "avatar file required!!");
+  }
+
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  const newAvatar = await uploadOnCloudinary(avatarLocalPath);
+  if (!newAvatar?.url) {
+    throw new ApiError(400, "Avatar upload failed");
+  }
+
+  if (user.avatar?.public_id) {
+    await deleteFromCloudinary(user.avatar.public_id);
+  }
+  user.avatar = {
+    url: newAvatar.url,
+    public_id: newAvatar.public_id,
+  };
+
+  await user.save();
+  const updatedUser = await User.findById(req.user._id).select(
+    "-password -refreshToken",
+  );
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, updatedUser, "Avatar updated successfully"));
+});
 
 export {
   registerUser,
@@ -230,5 +268,6 @@ export {
   getCurrentUserProfile,
   changePassword,
   updateUserProfile,
-  refreshAccessToken
+  refreshAccessToken,
+  updateAvatar,
 };

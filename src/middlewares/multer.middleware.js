@@ -1,14 +1,27 @@
-import multer from "multer"
-
+import multer from "multer";
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, "./public/temp")
+    cb(null, "./public/temp");
   },
   filename: function (req, file, cb) {
-    
-      cb(null, file.originalname)
-  }
-})
+    cb(null, file.originalname);
+  },
+});
 
-export const upload = multer({ storage })
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only JPG, PNG and WEBP images are allowed"), false);
+  }
+};
+
+export const upload = multer({
+  storage,
+  limits: {
+    fileSize: 2 * 1024 * 1024, //2 MB
+  },
+  fileFilter,
+});

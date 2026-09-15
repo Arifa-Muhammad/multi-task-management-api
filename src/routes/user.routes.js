@@ -6,12 +6,12 @@ import {
   updateProfileValidation,
   validate,
 } from "../middlewares/validation.middleware.js";
-import { changePassword, getCurrentUserProfile, loginUser, logoutUser, refreshAccessToken, registerUser, updateUserProfile } from "../controllers/user.controller.js";
+import { changePassword, getCurrentUserProfile, loginUser, logoutUser, refreshAccessToken, registerUser, updateAvatar, updateUserProfile } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 
 const router = Router();
-console.log("routing start");
+// console.log("routing start");
 
 router.route("/register").post(
   upload.fields([
@@ -21,12 +21,12 @@ router.route("/register").post(
     },
   ]),
 
-  (req, res, next) => {
-    console.log("✅ MULTER DONE");
-    console.log("BODY:", req.body);
-    console.log("FILES:", req.files);
-    next();
-  },
+  // (req, res, next) => {
+  //   console.log("✅ MULTER DONE");
+  //   console.log("BODY:", req.body);
+  //   console.log("FILES:", req.files);
+  //   next();
+  // },
   registerValidation,
   validate,
   registerUser,
@@ -42,4 +42,6 @@ router.route("/change-password").put(verifyJWT,changePasswordValidation,validate
 router.route("/update-profile").put(verifyJWT,updateProfileValidation, validate,updateUserProfile)
 
 router.route("/generate-Access-Token").post(refreshAccessToken)
+
+router.put("/update-avatar", verifyJWT, upload.single("avatar"), updateAvatar)
 export default router;
