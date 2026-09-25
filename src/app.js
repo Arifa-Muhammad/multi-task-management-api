@@ -2,19 +2,20 @@ import express from "express"
 import cors from "cors"
 import cookieParser from "cookie-parser"
 import { errorHandler } from "./middlewares/error.middlewre.js"
-
+import helmet from "helmet";
 
 const app= express()
 app.use(cors({
     origin: process.env.CORS_ORIGIN,
     credentials: true
 }))
-
+app.use(helmet());
 app.use(express.json({limit: "20kb"}))
 app.use(express.urlencoded({limit:"20kb"}))
 app.use(express.static("public"))
 
 app.use(cookieParser())
+
 //routes here
 app.use((req, res, next) => {
     console.log("🔥 REQUEST REACHED APP");
@@ -26,6 +27,14 @@ app.use("/api/v1/auth", userRouter)
 
 import taskRouter from "./routes/task.route.js"
 app.use("/api/v1/task", taskRouter)
+
+// 404 handler
+app.use((req, res) => {
+  return res.status(404).json({
+    success: false,
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
+  });
+});
 
 app.use(errorHandler)
 

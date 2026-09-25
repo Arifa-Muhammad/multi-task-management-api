@@ -1,4 +1,4 @@
-import { body, validationResult } from "express-validator";
+import { body, validationResult,query } from "express-validator";
 import { ApiError } from "../utils/apiErrors.js";
 
 const registerValidation = [
@@ -82,6 +82,33 @@ const createTaskValidation = [
     .withMessage("Due date must be a valid date"),
 ];
 
+const searchTaskValidation = [
+  query("status")
+    .optional()
+    .isIn(["pending", "completed"])
+    .withMessage("Status must be pending or completed"),
+
+  query("priority")
+    .optional()
+    .isIn(["low", "medium", "high"])
+    .withMessage("Priority must be low, medium or high"),
+
+  query("page")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("Page must be at least 1"),
+
+  query("limit")
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("Limit must be between 1 and 100"),
+
+  query("sort")
+    .optional()
+    .isIn(["newest", "oldest"])
+    .withMessage("Sort must be newest or oldest"),
+];
+
 const validate = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -96,5 +123,6 @@ export {
   changePasswordValidation,
   updateProfileValidation,
   createTaskValidation,
+  searchTaskValidation,
   validate,
 };

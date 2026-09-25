@@ -7,6 +7,7 @@ import {
 } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 import jwt from "jsonwebtoken";
+import fs from "fs/promises"
 
 //create controller for user register
 const registerUser = asyncHandler(async (req, res) => {
@@ -21,13 +22,10 @@ const registerUser = asyncHandler(async (req, res) => {
   //return res
 
   // 1. Get information from frontend
-  console.log("controller started..");
-  console.log("REQ BODY:", req.body);
-
   const { email, username, password, fullName } = req.body;
 
   // 2. Check if user already exists
-  console.log("2 body received");
+  
   const existedUser = await User.findOne({
     $or: [{ username }, { email }],
   });
@@ -36,21 +34,26 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   // 3. Get avatar local path
-  console.log("3 user checked");
+  
   const avatarLocalPath = req.files?.avatar?.[0]?.path;
   if (!avatarLocalPath) {
     throw new ApiError(400, "avatar image required");
   }
 
   // 4. Upload avatar to Cloudinary
-  console.log("4 avatar path:", avatarLocalPath);
+  
   const avatar = await uploadOnCloudinary(avatarLocalPath);
   if (!avatar) {
-    throw new ApiError(500, "upload failed!!");
+    throw new ApiError(400, "upload failed!!");
   }
+  try {
+  await fs.unlink(avatarLocalPath);
+} catch (error) {
+  console.log("TEMP FILE DELETE ERROR:", error.message);
+}
 
   // 5. Create user
-  console.log("user created");
+ 
 
   const newUser = await User.create({
     username,
@@ -112,7 +115,7 @@ const loginUser = asyncHandler(async (req, res) => {
     secure: false,
   };
   return res
-    .status(201)
+    .status(200)
     .cookie("accessToken", accessToken, options)
     .cookie("refreshToken", refreshToken, options)
     .json(new ApiResponse(201, "user login successfully."));
@@ -158,7 +161,7 @@ const changePassword = asyncHandler(async (req, res) => {
 
   const validPaswword = await user.isPasswordCorrect(oldPassword);
   if (!validPaswword) {
-    throw new ApiError(400, "invalid old password");
+    throw new ApiError(401, "invalid old password");
   }
   user.password = newPassword;
   await user.save();
@@ -201,17 +204,31 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   if (!incomingRefreshToken) {
     throw new ApiError(401, "refresh token required!!");
   }
-  const decodedToken = jwt.verify(
-    incomingRefreshToken,
-    process.env.REFRESH_TOKEN_SECRETE,
-  );
+  let decodedToken;
+
+  try {
+    decodedToken = jwt.verify(
+      incomingRefreshToken,
+      process.env.REFRESH_TOKEN_SECRETE,
+    );
+  } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      throw new ApiError(401, "Refresh token expired. Please login again");
+    }
+
+    if (error.name === "JsonWebTokenError") {
+      throw new ApiError(401, "Invalid refresh token");
+    }
+
+    throw new ApiError(401, "Refresh token verification failed");
+  }
   const user = await User.findById(decodedToken?._id);
   if (!user) {
     throw new ApiError(401, "Invalid refresh token");
   }
 
   if (incomingRefreshToken !== user.refreshToken) {
-    throw new ApiError(404, "Refresh token is expired or invalid");
+    throw new ApiError(401, "Refresh token is expired or invalid");
   }
   const newAccessToken = user.generateAccessToken();
 

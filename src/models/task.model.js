@@ -39,4 +39,9 @@ const taskSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+taskSchema.index({ owner: 1, isDeleted: 1 });
+taskSchema.index({ owner: 1, status: 1, isDeleted: 1 });
+taskSchema.index({ owner: 1, priority: 1, isDeleted: 1 });
+taskSchema.index({ owner: 1, createdAt: -1 });
+
 export const Task = mongoose.model("Task", taskSchema);

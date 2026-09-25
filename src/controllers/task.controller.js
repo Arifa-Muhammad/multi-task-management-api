@@ -26,19 +26,20 @@ const createTask = asyncHandler(async (req, res) => {
   });
 
   return res
-    .status(200)
-    .json(new ApiResponse(200, task, "task created successfully!!"));
+    .status(201)
+    .json(new ApiResponse(201, task, "task created successfully!!"));
 });
 
 //2. Read all task
 const getAllTask = asyncHandler(async (req, res) => {
   const tasks = await Task.find({
     owner: req.user._id,
+    isDeleted: false,
   });
 
   return res
-    .status(201)
-    .json(new ApiResponse(201, tasks, "task fetched successfully.."));
+    .status(200)
+    .json(new ApiResponse(200, tasks, "task fetched successfully.."));
 });
 
 //3. get one task by title
@@ -73,50 +74,55 @@ const getTaskById = asyncHandler(async (req, res) => {
   }
 
   return res
-    .status(201)
-    .json(new ApiResponse(201, task, "task fetched by id successfully"));
+    .status(200)
+    .json(new ApiResponse(200, task, "task fetched by id successfully"));
 });
 //4. update task
 const updateTask = asyncHandler(async (req, res) => {
   const { taskId } = req.params;
   const { title, description, priority, status, dueDate } = req.body;
-  const task = await Task.findOneAndUpdate(
-    {
-      owner: req.user._id,
-      _id: taskId,
-    },
-    {
-      $set: {
-        title,
-        description,
-        priority,
-        dueDate,
-        status,
-      },
-    },
-    {
-      new: true,
-      runValidators: true,
-    },
-  );
+
+  const task = await Task.findOne({
+    _id: taskId,
+    owner: req.user._id,
+    isDeleted: false,
+  });
+
   if (!task) {
-    throw new ApiError(404, "task not found");
+    throw new ApiError(404, "Task not found");
   }
 
-  // Activity create
+  const oldStatus = task.status;
+
+  task.title = title;
+  task.description = description;
+  task.priority = priority;
+  task.status = status;
+  task.dueDate = dueDate;
+
+  await task.save();
+
+  const action =
+    oldStatus !== "completed" && status === "completed"
+      ? "completed"
+      : "updated";
+
   await Activity.create({
     user: req.user._id,
     task: task._id,
-    action: "updated",
-    message: `Task "${task.title}" updated`,
+    action,
+    message:
+      action === "completed"
+        ? `Task "${task.title}" completed`
+        : `Task "${task.title}" updated`,
   });
 
   return res
-    .status(201)
-    .json(new ApiResponse(201, task, "task updated successfully"));
+    .status(200)
+    .json(new ApiResponse(200, task, "Task updated successfully"));
 });
 
-//5. delete task
+5; //delete task
 const deleteTask = asyncHandler(async (req, res) => {
   const { taskId } = req.params;
   const task = await Task.findOneAndDelete({
@@ -125,15 +131,18 @@ const deleteTask = asyncHandler(async (req, res) => {
   });
 
   if (!task) {
-    throw new ApiError(401, "task not found ");
+    throw new ApiError(404, "task not found ");
   }
 
   return res
-    .status(202)
-    .json(new ApiResponse(201, task, "task deleted successfully.."));
+    .status(200)
+    .json(new ApiResponse(200, task, "task deleted successfully.."));
 });
 
 //search
+const escapeRegex = (value) => {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+};
 const searchTask = asyncHandler(async (req, res) => {
   const {
     title,
@@ -145,12 +154,22 @@ const searchTask = asyncHandler(async (req, res) => {
   } = req.query;
   const filter = {
     owner: req.user._id,
+    isDeleted: false,
   };
 
   //search by title
-  if (title) {
+  if (title?.trim()) {
+    const safeTitle = escapeRegex(title.trim());
+
     filter.title = {
-      $regex: title,
+      $regex: safeTitle,
+      $options: "i",
+    };
+  }
+  if (title) {
+    const safeTitle = escapeRegex(title.trim());
+    filter.title = {
+      $regex: safeTitle,
       $options: "i",
     };
   }
@@ -182,27 +201,44 @@ const searchTask = asyncHandler(async (req, res) => {
     .limit(Number(limit))
     .sort(sortOption);
 
+  const totalTasks = await Task.countDocuments(filter);
+  const totalPages = Math.ceil(totalTasks / Number(limit));
+
+  const pagination = {
+    totalTasks,
+    totalPages,
+    currentPage: Number(page),
+    limit: Number(limit),
+    hasNextPage: Number(page) < totalPages,
+    hasPreviousPage: Number(page) > 1,
+  };
   return res
     .status(200)
-    .json(new ApiResponse(200, tasks, "task fetched successfully"));
+    .json(
+      new ApiResponse(200, { tasks, pagination }, "task fetched successfully"),
+    );
 });
 
 //get task statistics
 const getTaskStats = asyncHandler(async (req, res) => {
   const totalTask = await Task.countDocuments({
     owner: req.user._id,
+    isDeleted: false,
   });
   const completedTask = await Task.countDocuments({
     owner: req.user._id,
     status: "completed",
+    isDeleted: false,
   });
   const pendingTask = await Task.countDocuments({
     owner: req.user._id,
     status: "pending",
+    isDeleted: false,
   });
   const priorityTask = await Task.countDocuments({
     owner: req.user._id,
     priority: "high",
+    isDeleted: false,
   });
 
   let completionPercentage = 0;
@@ -230,6 +266,7 @@ const softDelete = asyncHandler(async (req, res) => {
   const task = await Task.findOne({
     _id: taskId,
     owner: req.user._id,
+    isDeleted: false,
   });
   if (!task) {
     throw new ApiError(404, "Task not found");
@@ -251,6 +288,37 @@ const softDelete = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, task, "Task deleted successfully"));
 });
 
+//restore soft delete
+const restoreTask = asyncHandler(async (req, res) => {
+  const { taskId } = req.params;
+
+  const task = await Task.findOne({
+    _id: taskId,
+    owner: req.user._id,
+    isDeleted: true,
+  });
+
+  if (!task) {
+    throw new ApiError(404, "Deleted task not found");
+  }
+
+  task.isDeleted = false;
+
+  await task.save();
+
+  // Activity create
+  await Activity.create({
+    user: req.user._id,
+    task: task._id,
+    action: "restored",
+    message: `Task "${task.title}" restored`,
+  });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, task, "Task restored successfully"));
+});
+
 export {
   createTask,
   getAllTask,
@@ -260,4 +328,5 @@ export {
   searchTask,
   getTaskStats,
   softDelete,
+  restoreTask,
 };
